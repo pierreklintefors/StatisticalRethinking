@@ -36,7 +36,7 @@ plot(p_grid, posterior, type = "b",
      xlab = "Probability of water", ylab = "Posterior probability")
 
 
-#2.5## Differnt priors
+#2.5## Different priors
 prior2 <- ifelse( p_grid < 0.5 , 0 , 1)
 
 prior3 <- exp( -5*abs( p_grid - 0.5 ) )
@@ -56,7 +56,7 @@ posterior3 = unstd_posterior3/sum(unstd_posterior3)
 plot(p_grid, posterior2, type = "b", 
      xlab = "Probability of water", ylab = "Posterior probability")
 
-#2.4#Ploting the posterior
+#2.4#Plotting the posterior
 
 plot(p_grid, posterior3, type = "b", 
      xlab = "Probability of water", ylab = "Posterior probability")
@@ -321,3 +321,4 @@ test_pos_birth = test_A*p_a + test_B*p_b
 p_a_test_pos_birth_infor = test_A*p_a / test_pos_birth
 
 p_a_test_pos_birth_infor
+
