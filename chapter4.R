@@ -412,3 +412,95 @@ PI( mu_at_50 , prob=0.89 )
 # R code 4.53
 mu <- link( m4.3 )
 str(mu)
+
+# Make a distribution for each weight in sample
+#R code 4.54
+
+# define sequence of weights to compute predictions for
+# these values will be on the horizontal axis
+weight.seq <- seq( from=25 , to=70 , by=1 )
+
+# use link to compute mu
+# for each sample from posterior
+# and for each weight in weight.seq
+mu <- link( m4.3 , data=data.frame(weight=weight.seq) )
+str(mu)
+
+# Summarise the distribution for each weight value
+
+#R code 4.56
+# summarize the distribution of mu
+mu.mean <- apply( mu , 2 , mean )
+mu.PI <- apply( mu , 2 , PI , prob=0.89 )
+
+plot(mu.mean)
+str(mu.PI)
+
+
+#Plot the data with line and shade indicating uncertainty for each weight value
+#R code 4.57
+
+# plot raw data
+# fading out points to make line and interval more visible
+plot( height ~ weight , data=d2 , col=col.alpha(rangi2,0.5) )
+
+# plot the MAP line, aka the mean mu for each weight
+lines( weight.seq , mu.mean )
+
+# plot a shaded region for 89% PI
+shade(mu.PI , weight.seq)
+
+
+# The link function is just iterating for each case in the data
+#The same can be done manually
+
+#R code 4.58
+
+post <- extract.samples(m4.3)
+mu.link <- function(weight) post$a + post$b*( weight - xbar )
+weight.seq <- seq( from=25 , to=70 , by=1 )
+mu <- sapply( weight.seq , mu.link )
+mu.mean <- apply( mu , 2 , mean )
+mu.CI <- apply( mu , 2 , PI , prob=0.89 )
+
+#R code 4.59
+sim.height <- sim( m4.3 , data=list(weight=weight.seq) )
+str(sim.height)
+
+# R code 4.60
+height.PI <- apply( sim.height , 2 , PI , prob=0.89 )
+
+#R code 4.61
+
+# plot raw data
+
+plot( height ~ weight , d2 , col=col.alpha(rangi2,0.5) )
+
+# draw MAP line
+lines( weight.seq , mu.mean )
+
+# draw HPDI region for line
+shade( mu.HPDI , weight.seq )
+
+
+# draw PI region for simulated heights
+shade( height.PI , weight.seq )
+
+#R code 4.62
+
+sim.height <- sim( m4.3 , data=list(weight=weight.seq) , n=1e4 )
+
+height.PI <- apply( sim.height , 2 , PI , prob=0.89 )
+
+#R code 4.61
+# plot raw data
+plot( height ~ weight , d2 , col=col.alpha(rangi2,0.5) )
+
+# draw MAP line
+lines( weight.seq , mu.mean )
+
+# draw HPDI region for line
+shade( mu.HPDI , weight.seq )
+
+# draw PI region for simulated heights
+shade( height.PI , weight.seq )
