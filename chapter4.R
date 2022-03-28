@@ -413,9 +413,8 @@ PI( mu_at_50 , prob=0.89 )
 mu <- link( m4.3 )
 str(mu)
 
-# Make a distribution for each weight in sample
+# Make a distribution for different weight vlaues in sample
 #R code 4.54
-
 # define sequence of weights to compute predictions for
 # these values will be on the horizontal axis
 weight.seq <- seq( from=25 , to=70 , by=1 )
@@ -455,7 +454,6 @@ shade(mu.PI , weight.seq)
 #The same can be done manually
 
 #R code 4.58
-
 post <- extract.samples(m4.3)
 mu.link <- function(weight) post$a + post$b*( weight - xbar )
 weight.seq <- seq( from=25 , to=70 , by=1 )
@@ -471,36 +469,221 @@ str(sim.height)
 height.PI <- apply( sim.height , 2 , PI , prob=0.89 )
 
 #R code 4.61
-
 # plot raw data
-
 plot( height ~ weight , d2 , col=col.alpha(rangi2,0.5) )
 
 # draw MAP line
 lines( weight.seq , mu.mean )
 
+mu.HPDI <- apply(mu, 2, HPDI, prob = 0.89)
+
 # draw HPDI region for line
 shade( mu.HPDI , weight.seq )
-
 
 # draw PI region for simulated heights
 shade( height.PI , weight.seq )
 
 #R code 4.62
-
 sim.height <- sim( m4.3 , data=list(weight=weight.seq) , n=1e4 )
-
 height.PI <- apply( sim.height , 2 , PI , prob=0.89 )
 
-#R code 4.61
+# Plot again with larger sample 
 # plot raw data
 plot( height ~ weight , d2 , col=col.alpha(rangi2,0.5) )
-
 # draw MAP line
 lines( weight.seq , mu.mean )
-
 # draw HPDI region for line
 shade( mu.HPDI , weight.seq )
-
 # draw PI region for simulated heights
+shade( height.PI , weight.seq ) #Have smoother egdes now
+
+# Doing the sim function manually, drawing from a Gaussian distribution
+#R code 4.63
+post <- extract.samples(m4.3)
+weight.seq <- 25:70
+sim.height <- sapply( weight.seq , function(weight)
+  rnorm(
+    n=nrow(post) ,
+    mean=post$a + post$b*( weight - xbar ) ,
+    sd=post$sigma ) )
+height.PI <- apply( sim.height , 2 , PI , prob=0.89 )
+
+
+#### Polynomial regression
+
+#R code 4.64
+library(rethinking)
+data(Howell1)
+d <- Howell1
+
+plot(height ~weight, data = d)
+
+#R code 4.65
+d$weight_s <- ( d$weight - mean(d$weight) )/sd(d$weight)
+#Squaring the predictor
+d$weight_s2 <- d$weight_s^2
+
+m4.5 <- quap(
+  alist(
+    height ~ dnorm( mu , sigma ) ,
+    mu <- a + b1*weight_s + b2*weight_s2 ,
+    a ~ dnorm( 178 , 20 ) ,
+    b1 ~ dlnorm( 0 , 1) ,
+    b2 ~ dnorm( 0 , 1 ) ,
+    sigma ~ dunif( 0 , 50 )
+  ) , data=d )
+
+
+#R code 4.66
+precis( m4.5 )
+
+
+## Plt the model fits
+
+#R code 4.67
+weight.seq <- seq( from=-2.2 , to=2 , length.out=30 )
+pred_dat <- list( weight_s=weight.seq , weight_s2=weight.seq^2 )
+mu <- link( m4.5 , data=pred_dat )
+mu.mean <- apply( mu , 2 , mean )
+mu.PI <- apply( mu , 2 , PI , prob=0.89 )
+sim.height <- sim( m4.5 , data=pred_dat )
+height.PI <- apply( sim.height , 2 , PI , prob=0.89 )
+
+#R code 4.68
+plot( height ~ weight_s , d , col=col.alpha(rangi2,0.5) )
+lines( weight.seq , mu.mean )
+shade( mu.PI , weight.seq )
 shade( height.PI , weight.seq )
+
+
+# Cubic (third polynomial)
+#R code 4.69
+d$weight_s3 <- d$weight_s^3
+m4.6 <- quap(
+  alist(
+    height ~ dnorm( mu , sigma ) ,
+    mu <- a + b1*weight_s + b2*weight_s2 + b3*weight_s3 ,
+    a ~ dnorm( 178 , 20 ) ,
+    b1 ~ dlnorm( 0 , 1 ) ,
+    b2 ~ dnorm( 0 , 10 ) ,
+    b3 ~ dnorm( 0 , 10 ) ,
+    sigma ~ dunif( 0 , 50 )
+  ) , data=d )
+
+
+pred_dat <- list( weight_s=weight.seq , weight_s2=weight.seq^2, weight_s3 = weight.seq^3 )
+mu <- link( m4.5 , data=pred_dat )
+mu.mean <- apply( mu , 2 , mean )
+mu.PI <- apply( mu , 2 , PI , prob=0.89 )
+sim.height <- sim( m4.5 , data=pred_dat )
+height.PI <- apply( sim.height , 2 , PI , prob=0.89 )
+
+plot( height ~ weight_s , d , col=col.alpha(rangi2,0.5) )
+lines( weight.seq , mu.mean )
+shade( mu.PI , weight.seq )
+shade( height.PI , weight.seq )
+
+
+#Convering back to natural scale (from standardised)
+
+#Turn off the x-axis
+#R code 4.70
+plot( height ~ weight_s , d , col=col.alpha(rangi2,0.5) , xaxt="n" )
+
+#R code 4.71
+at <- c(-2,-1,0,1,2)
+labels <- at*sd(d$weight) + mean(d$weight)
+axis( side=1 , at=at , labels=round(labels,1) )
+
+
+####### B-splines ###########
+
+#R code 4.72
+library(rethinking)
+data(cherry_blossoms)
+d <- cherry_blossoms
+precis(d)
+
+plot(doy ~year, d)
+
+#R code 4.73
+##Knots are pivot points for the basis functions
+d2 <- d[ complete.cases(d$doy) , ] # complete cases on doy
+num_knots <- 15
+knot_list <- quantile( d2$year , probs=seq(0,1,length.out=num_knots) )
+
+knot_list
+
+#Decide the polynomial degree, how many basis function to be combined
+#R code 4.74
+library(splines)
+B <- bs(d2$year,
+        knots=knot_list[-c(1,num_knots)] ,
+        degree=3 , intercept=TRUE )
+
+# Displaying basis functions
+#R code 4.75
+plot( NULL , xlim=range(d2$year) , ylim=c(0,1) , xlab="year" , ylab="basis" )
+for ( i in 1:ncol(B) ) lines( d2$year , B[,i] )
+
+
+#R code 4.76
+# Creating a quadratic approximative model with 
+m4.7 <- quap(
+  alist(
+    D ~ dnorm( mu , sigma ) ,
+    mu <- a + B %*% w , # Multiplying each element in w with corresponding row i B
+    a ~ dnorm(100,10),
+    w ~ dnorm(0,10),
+    sigma ~ dexp(1) #Exponential distribution for prior
+  ), data=list( D=d2$doy , B=B ) ,
+  start=list( w=rep( 0 , ncol(B) ) ) )
+
+
+#Plot the weighted basis functions
+#R code 4.77
+post <- extract.samples( m4.7 )
+w <- apply( post$w , 2 , mean )
+plot( NULL , xlim=range(d2$year) , ylim=c(-6,6) ,
+      xlab="year" , ylab="basis * weight" )
+for ( i in 1:ncol(B) ) lines( d2$year , w[i]*B[,i] )
+
+
+#Adding posterior interval for mu for each year
+#R code 4.78
+mu <- link( m4.7 )
+mu_PI <- apply(mu,2,PI,0.97)
+plot( d2$year , d2$doy , col=col.alpha(rangi2,0.3) , pch=16)
+shade( mu_PI , d2$year , col=col.alpha("black",0.5) )
+
+
+#Another, less elegant way of doing the model without matrix multiplication
+#R code 4.79
+m4.7alt <- quap(
+  alist(
+    D ~ dnorm( mu , sigma ) ,
+    mu <- a + sapply( 1:827 , function(i) sum( B[i,]*w ) ) ,
+    a ~ dnorm(100,1),
+    w ~ dnorm(0,10),
+    sigma ~ dexp(1)
+  ),
+  data=list( D=d2$doy , B=B ) ,
+  start=list( w=rep( 0 , ncol(B) ) ) )
+
+
+############ Practice ############################3
+
+#E1
+e1 = "yi~Normal(μ,σ)"
+
+#E2
+e2 = "2 parameters"
+
+#E3
+e3 = "P(μ,σ|y) = ∏iNormal(yi|μ,σ)Normal(0|10)Exp(1)/
+              integral(Normal(yi|μ,σ)Normal(0|10)Exp(1))"
+#E4
+e4 = "μi=α+βxi"
+
+#E5
+e5 = "3 parameters"
