@@ -785,7 +785,7 @@ B <- bs(d2$year,
         knots=knot_list[-c(1,num_knots)] ,
         degree=3 , intercept=TRUE )
 
-weight_sd = 1000
+weight_sd = 10
 # Creating a quadratic approximative model with 
 m4.7 <- quap(
   alist(
