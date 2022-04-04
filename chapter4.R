@@ -762,3 +762,4 @@ curve(a_map+b_map*(x-mean(d2$weight)), add = TRUE)
 a_map <- mean(post_m7$a)
 b_map <- mean(post_m7$b)
 curve(a_map+b_map*x, add = TRUE)
+
