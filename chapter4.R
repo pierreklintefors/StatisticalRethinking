@@ -764,3 +764,43 @@ b_map <- mean(post_m7$b)
 curve(a_map+b_map*x, add = TRUE)
 
 
+#M8
+
+library(rethinking)
+data(cherry_blossoms)
+d <- cherry_blossoms
+precis(d)
+
+plot(doy ~year, d)
+
+##Knots are pivot points for the basis functions
+d2 <- d[ complete.cases(d$doy) , ] # complete cases on doy
+num_knots <- 30
+knot_list <- quantile( d2$year , probs=seq(0,1,length.out=num_knots) )
+
+
+#Decide the polynomial degree, how many basis function to be combined
+library(splines)
+B <- bs(d2$year,
+        knots=knot_list[-c(1,num_knots)] ,
+        degree=3 , intercept=TRUE )
+
+weight_sd = 1000
+# Creating a quadratic approximative model with 
+m4.7 <- quap(
+  alist(
+    D ~ dnorm( mu , sigma ) ,
+    mu <- a + B %*% w , # Multiplying each element in w with corresponding row i B
+    a ~ dnorm(100,10),
+    w ~ dnorm(0,100),
+    sigma ~ dexp(1) #Exponential distribution for prior
+  ), data=list( D=d2$doy , B=B ) ,
+  start=list( w=rep( 0 , ncol(B) ) ) )
+
+
+mu <- link( m4.7 )
+mu_PI <- apply(mu,2,PI,0.97)
+plot( d2$year , d2$doy , col=col.alpha(rangi2,0.3) , pch=16, main = paste("Weight_sd prior:", weight_sd, "Knots:", num_knots ))
+shade( mu_PI , d2$year , col=col.alpha("black",0.5) )
+
+
