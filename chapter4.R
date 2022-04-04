@@ -687,3 +687,78 @@ e4 = "μi=α+βxi"
 
 #E5
 e5 = "3 parameters"
+
+#Medium
+
+#M1
+sim.values = as.data.frame(rnorm(n = 1e3, mean = 0, sd = 10))
+colnames(sim.values)= "y"
+
+#M2 
+library(rethinking)
+m2 = quap(
+  alist(
+    y ~ dnorm(mu, sigma),
+    mu ~ dnorm(0,10),
+    sigma <- dexp(1)
+  ),data = sim.values
+)
+
+
+#M3 Translate quap model below into mathematical formulation
+#y ~ dnorm( mu , sigma ),
+#mu <- a + b*x,
+#a ~ dnorm( 0 , 10 ),
+#b ~ dunif( 0,1),
+#sigma ~ dexp( 1 )
+
+
+m3 = "yi ~ Normal(mu,sigma)
+      mui = a + b*xi
+      a ~ Normal(0, 10),
+      b ~Uniform(0, 1)
+      sigma ~ Exponential(1)"
+
+#M4 Linear regression model of height ~ year
+m4 = "height ~ Normal (mu, sigma)
+      mu = a + b*year,
+      a ~ LogNormal(150, 80),
+      b ~ LogNormal(10, 50),
+      sigma ~ Uniform(0,80)"
+#M5 
+m5 = "No, the slope was already constricted to positive values"
+
+#M6
+m6 = "If the variance between each year in not more than 64 cm the sigma prior
+      could be restrained, however it could be reasonable to keep it wide becasue
+      the normal distribution of height refers to all ages"
+
+#M7
+library(rethinking)
+data(Howell1); d <- Howell1; d2 <- d[ d$age >= 18 , ]
+
+str(m4.3)
+
+m7 <- quap(
+  alist(
+    height ~ dnorm( mu , sigma ) ,
+    mu <- a + b*( weight ) ,
+    a ~ dnorm( 178 , 20 ) ,
+    b ~ dlnorm( 0 , 1 ) ,
+    sigma ~ dunif( 0 , 50 )
+  ) , data=d2 )
+
+vcov(m7)
+vcov(m4.3)
+
+post_m4.3 = extract.samples(m4.3)
+post_m7 = extract.samples(m7)
+
+plot( height ~ weight , data=d2 , col=rangi2 )
+a_map <- mean(post_m4.3$a)
+b_map <- mean(post_m4.3$b)
+
+curve(a_map+b_map*(x-mean(d2$weight)), add = TRUE)
+a_map <- mean(post_m7$a)
+b_map <- mean(post_m7$b)
+curve(a_map+b_map*x, add = TRUE)
