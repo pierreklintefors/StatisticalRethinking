@@ -384,3 +384,33 @@ mu <- link( m5.5 , post=prior , data=list(N=xseq) )
 plot( NULL , xlim=xseq , ylim=xseq )
 for ( i in 1:50 ) lines( xseq , mu[i,] , col=col.alpha("black",0.3) )
 
+#R code 5.36
+precis( m5.5 )
+
+
+#R code 5.37
+xseq <- seq( from=min(dcc$N)-0.15 , to=max(dcc$N)+0.15 , length.out=30 )
+mu <- link( m5.5 , data=list(N=xseq) )
+mu_mean <- apply(mu,2,mean)
+mu_PI <- apply(mu,2,PI)
+plot( K ~ N , data=dcc )
+lines( xseq , mu_mean , lwd=2 )
+shade( mu_PI , xseq )
+
+# New bivariate model of calories with the logarithmised mass (M) as predictor
+#R code 5.38
+
+m5.6 <- quap(
+  alist(
+    K ~ dnorm( mu , sigma ) ,
+    mu <- a + bM*M ,
+    a ~ dnorm( 0 , 0.2 ) ,
+    bM ~ dnorm( 0 , 0.5 ) ,
+    sigma ~ dexp( 1 )
+  ) , data=dcc )
+precis(m5.6)
+
+plot( K ~ N , data=dcc )
+lines( xseq , mu_mean , lwd=2 )
+shade( mu_PI , xseq )
+
