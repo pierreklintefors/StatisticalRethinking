@@ -410,7 +410,11 @@ m5.6 <- quap(
   ) , data=dcc )
 precis(m5.6)
 
-plot( K ~ N , data=dcc )
+xseq <- seq( from=min(dcc$M)-0.15 , to=max(dcc$M)+0.15 , length.out=30 )
+mu <- link( m5.6 , data=list(M=xseq) )
+mu_mean <- apply(mu,2,mean)
+mu_PI <- apply(mu,2,PI)
+plot( K ~ M , data=dcc )
 lines( xseq , mu_mean , lwd=2 )
 shade( mu_PI , xseq )
 
