@@ -397,7 +397,8 @@ plot( K ~ N , data=dcc )
 lines( xseq , mu_mean , lwd=2 )
 shade( mu_PI , xseq )
 
-# New bivariate model of calories with the logarithmised mass (M) as predictor
+# New bivariate model of calories with the logarithmised mass (M) as predictor.
+#The log is used because it translates the relationship to the magnitude of mass
 #R code 5.38
 
 m5.6 <- quap(
@@ -418,3 +419,276 @@ plot( K ~ M , data=dcc )
 lines( xseq , mu_mean , lwd=2 )
 shade( mu_PI , xseq )
 
+
+#New model with both neocortex proportional size and log of of body mass as predictors
+#R code 5.39
+m5.7 <- quap(
+  alist(
+    K ~ dnorm( mu , sigma ) ,
+    mu <- a + bN*N + bM*M ,
+    a ~ dnorm( 0 , 0.2 ) ,
+    bN ~ dnorm( 0 , 0.5 ) ,
+    bM ~ dnorm( 0 , 0.5 ) ,
+    sigma ~ dexp( 1 )
+  ) , data=dcc )
+precis(m5.7)
+
+#Visualize and comparing the posteriors of the models
+#R code 5.40
+plot( coeftab( m5.5 , m5.6 , m5.7 ) , pars=c("bM","bN") )
+
+#Plot the correlation between kilocalories per gram, log(body mass) and neocortex
+pairs( ~K + M + N , dcc )
+
+
+#R code 5.41
+
+xseq <- seq( from=min(dcc$M)-0.15 , to=max(dcc$M)+0.15 , length.out=30 )
+mu <- link( m5.7 , data=data.frame( M=xseq , N=0 ) )
+mu_mean <- apply(mu,2,mean)
+mu_PI <- apply(mu,2,PI)
+plot( NULL , xlim=range(dcc$M) , ylim=range(dcc$K) )
+lines( xseq , mu_mean , lwd=2 )
+shade( mu_PI , xseq )
+
+
+#Predictions of neocortex effect on milk energy
+xseq <- seq( from=min(dcc$N)-0.15 , to=max(dcc$N)+0.15 , length.out=30 )
+mu <- link( m5.7 , data=data.frame( N=xseq , M=0 ) )
+mu_mean <- apply(mu,2,mean)
+mu_PI <- apply(mu,2,PI)
+plot( NULL , xlim=range(dcc$N) , ylim=range(dcc$K) )
+lines( xseq , mu_mean , lwd=2 )
+shade( mu_PI , xseq )
+
+# DAG where M->K<-N
+#R code 5.42
+# M -> K <- N
+# M -> N
+n <- 100
+M <- rnorm( n )
+N <- rnorm( n , M )
+K <- rnorm( n , N - M )
+d_sim <- data.frame(K=K,N=N,M=M)
+
+
+#Using the simulated data in the models
+#
+
+m5.5b <- quap(
+  alist(
+    K ~ dnorm( mu , sigma ) ,
+    mu <- a + bN*N ,
+    a ~ dnorm( 0 , 0.2 ) , # intercept closer to zero
+    bN ~ dnorm( 0 , 0.5 ) ,
+    sigma ~ dexp( 1 )
+  ) , data=d_sim )
+
+m5.6b <- quap(
+  alist(
+    K ~ dnorm( mu , sigma ) ,
+    mu <- a + bM*M ,
+    a ~ dnorm( 0 , 0.2 ) ,
+    bM ~ dnorm( 0 , 0.5 ) ,
+    sigma ~ dexp( 1 )
+  ) , data=d_sim )
+
+m5.7b <- quap(
+  alist(
+    K ~ dnorm( mu , sigma ) ,
+    mu <- a + bN*N + bM*M ,
+    a ~ dnorm( 0 , 0.2 ) ,
+    bN ~ dnorm( 0 , 0.5 ) ,
+    bM ~ dnorm( 0 , 0.5 ) ,
+    sigma ~ dexp( 1 )
+  ) , data=d_sim )
+
+# The slopes in the m5.7b becomes extreme
+precis(m5.5b)
+precis(m5.6b)
+precis(m5.7b)
+plot( coeftab( m5.5b , m5.6b , m5.7b ) , pars=c("bM","bN") )
+
+
+#Two other DAG simulated data set
+#R code 5.43
+# M -> K <- N
+# N -> M
+n <- 100
+N <- rnorm( n )
+M <- rnorm( n , N )
+K <- rnorm( n , N - M )
+d_sim2 <- data.frame(K=K,N=N,M=M)
+
+# M -> K <- N
+# M <- U -> N
+n <- 100
+U <- rnorm( n )
+N <- rnorm( n , U )
+M <- rnorm( n , U )
+K <- rnorm( n , N - M )
+d_sim3 <- data.frame(K=K,N=N,M=M)
+
+m5.5c <- quap(
+  alist(
+    K ~ dnorm( mu , sigma ) ,
+    mu <- a + bN*N ,
+    a ~ dnorm( 0 , 0.2 ) , # intercept closer to zero
+    bN ~ dnorm( 0 , 0.5 ) ,
+    sigma ~ dexp( 1 )
+  ) , data=d_sim2 )
+
+m5.6c <- quap(
+  alist(
+    K ~ dnorm( mu , sigma ) ,
+    mu <- a + bM*M ,
+    a ~ dnorm( 0 , 0.2 ) ,
+    bM ~ dnorm( 0 , 0.5 ) ,
+    sigma ~ dexp( 1 )
+  ) , data=d_sim2 )
+
+m5.7c <- quap(
+  alist(
+    K ~ dnorm( mu , sigma ) ,
+    mu <- a + bN*N + bM*M ,
+    a ~ dnorm( 0 , 0.2 ) ,
+    bN ~ dnorm( 0 , 0.5 ) ,
+    bM ~ dnorm( 0 , 0.5 ) ,
+    sigma ~ dexp( 1 )
+  ) , data=d_sim2 )
+
+# The slopes in t
+precis(m5.5c)
+precis(m5.6c)
+precis(m5.7c)
+
+m5.5d <- quap(
+  alist(
+    K ~ dnorm( mu , sigma ) ,
+    mu <- a + bN*N ,
+    a ~ dnorm( 0 , 0.2 ) , # intercept closer to zero
+    bN ~ dnorm( 0 , 0.5 ) ,
+    sigma ~ dexp( 1 )
+  ) , data=d_sim3 )
+
+m5.6d <- quap(
+  alist(
+    K ~ dnorm( mu , sigma ) ,
+    mu <- a + bM*M ,
+    a ~ dnorm( 0 , 0.2 ) ,
+    bM ~ dnorm( 0 , 0.5 ) ,
+    sigma ~ dexp( 1 )
+  ) , data=d_sim3 )
+
+m5.7d <- quap(
+  alist(
+    K ~ dnorm( mu , sigma ) ,
+    mu <- a + bN*N + bM*M ,
+    a ~ dnorm( 0 , 0.2 ) ,
+    bN ~ dnorm( 0 , 0.5 ) ,
+    bM ~ dnorm( 0 , 0.5 ) ,
+    sigma ~ dexp( 1 )
+  ) , data=d_sim3 )
+
+# The slopes in the m5.7b becomes extreme
+precis(m5.5d)
+precis(m5.6d)
+precis(m5.7d)
+
+## The Markov equivalence set can be computed using dagitty
+#R code 5.44
+dag5.7 <- dagitty( "dag{
+M -> K <- N
+M -> N }" )
+coordinates(dag5.7) <- list( x=c(M=0,K=1,N=2) , y=c(M=0.5,K=1,N=0.5) )
+MElist <- equivalentDAGs(dag5.7)
+
+drawdag(MElist)
+
+
+############# Categories #################
+#R code 5.45
+data(Howell1)
+d <- Howell1
+str(d)
+
+#If a prior is assigned to the difference in the criterion variable
+#it assumes that one of the categories is more uncertain than the other
+
+#The prior distribution of male and females
+
+#R code 5.46
+mu_female <- rnorm(1e4,178,20)
+mu_male <- rnorm(1e4,178,20) + rnorm(1e4,0,10)
+precis( data.frame( mu_female , mu_male ) ) #This makes the interval for males wider
+
+#R code 5.47
+d$sex <- ifelse( d$male==1 , 2 , 1 ) # making female=1 and male=2
+str( d$sex )
+#Now, the same prior can be used for both categories, by indexing a based on sex
+m5.8 <- quap(
+  alist(
+    height ~ dnorm( mu , sigma ) ,
+    mu <- a[sex] ,
+    a[sex] ~ dnorm( 178 , 20 ) ,
+    sigma ~ dunif( 0 , 50 )
+  ) , data=d )
+precis( m5.8 , depth=2 )
+
+#Expected differnece by extracting samples
+#R code 5.49
+post <- extract.samples(m5.8)
+post$diff_fm <- post$a[,1] - post$a[,2]
+precis( post , depth=2 )
+
+#Making an index variable of multiple categories from milk data
+#R code 5.50
+data(milk)
+d <- milk
+levels(d$clade)
+
+#R code 5.51
+d$clade_id <- as.integer( d$clade )
+
+#R code 5.52
+d$K <- standardize( d$kcal.per.g )
+m5.9 <- quap(
+  alist(
+    K ~ dnorm( mu , sigma ),
+    mu <- a[clade_id],
+    a[clade_id] ~ dnorm( 0 , 0.5 ),
+    sigma ~ dexp( 1 )
+  ) , data=d )
+
+labels <- paste( "a[" , 1:4 , "]:" , levels(d$clade) , sep="" )
+plot( precis( m5.9 , depth=2 , pars="a" ) , labels=labels ,
+      xlab="expected kcal (std)" )
+
+#R code 5.53
+set.seed(63)
+d$house <- sample( rep(1:4,each=8) , size=nrow(d) )
+
+# R code 5.54
+m5.10 <- quap(
+  alist(
+    K ~ dnorm( mu , sigma ),
+    mu <- a[clade_id] + h[house],
+    a[clade_id] ~ dnorm( 0 , 0.5 ),
+    h[house] ~ dnorm( 0 , 0.5 ),
+    sigma ~ dexp( 1 )
+  ) , data=d )
+
+precis(m5.10, depth = 2)
+labels <- paste( "a[" , 1:4 , "]:" , c("GRyffindor", "Hufflepuff", "Ravenclaw",
+                                       "Slytherin") , sep="" )
+plot( precis( m5.10 , depth=2 , pars="a" ) , labels=labels ,
+      xlab="expected kcal (std)" )
+
+############# PRACTICE ####################################
+#EASY
+e1 = "μi=βxxi+βz & μi=α+βxxi+βzzi"
+e2 = "AD ~Normal(mu,sigma),
+      mu = a+  bl*l + bpd*pd,
+      a ~ Normal(0, 50),
+      bl ~Normal(0,1),
+      bpd ~Normal(0,1"
