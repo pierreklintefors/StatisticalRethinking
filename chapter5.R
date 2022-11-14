@@ -184,8 +184,9 @@ mu_PI <- apply(mu,2, PI)
 plot(D~mu_resid, data = d)
 
 D_seq <- seq( from=-2 , to=2 , length.out=50 )
-lines( D_seq , mu.mean , lwd=2 )
+lines( D_seq , mu_mean , lwd=2 )
 shade(mu_PI , D_seq )
+
 
 
 ###Posterior prediction plots
@@ -347,7 +348,6 @@ dcc <- d[ complete.cases(d$K,d$N,d$M) , ]
 
 
 #R code 5.33
-
 m5.5_draft <- quap(
   alist(
     K ~ dnorm( mu , sigma ) ,
@@ -359,7 +359,6 @@ m5.5_draft <- quap(
 
 
 #Simulate and plot regression lines of the priors
-
 #R code 5.34
 prior <- extract.prior( m5.5_draft )
 xseq <- c(-2,2)
@@ -397,7 +396,7 @@ plot( K ~ N , data=dcc )
 lines( xseq , mu_mean , lwd=2 )
 shade( mu_PI , xseq )
 
-# New bivariate model of calories with the logarithmised mass (M) as predictor.
+# New bivariate model of calories with the logarithmized mass (M) as predictor.
 #The log is used because it translates the relationship to the magnitude of mass
 #R code 5.38
 
@@ -447,7 +446,7 @@ xseq <- seq( from=min(dcc$M)-0.15 , to=max(dcc$M)+0.15 , length.out=30 )
 mu <- link( m5.7 , data=data.frame( M=xseq , N=0 ) )
 mu_mean <- apply(mu,2,mean)
 mu_PI <- apply(mu,2,PI)
-plot( NULL , xlim=range(dcc$M) , ylim=range(dcc$K) )
+plot( NULL, xlim=range(dcc$M) , ylim=range(dcc$K) )
 lines( xseq , mu_mean , lwd=2 )
 shade( mu_PI , xseq )
 
@@ -520,14 +519,6 @@ M <- rnorm( n , N )
 K <- rnorm( n , N - M )
 d_sim2 <- data.frame(K=K,N=N,M=M)
 
-# M -> K <- N
-# M <- U -> N
-n <- 100
-U <- rnorm( n )
-N <- rnorm( n , U )
-M <- rnorm( n , U )
-K <- rnorm( n , N - M )
-d_sim3 <- data.frame(K=K,N=N,M=M)
 
 m5.5c <- quap(
   alist(
@@ -561,6 +552,17 @@ m5.7c <- quap(
 precis(m5.5c)
 precis(m5.6c)
 precis(m5.7c)
+plot( coeftab( m5.5c , m5.6c , m5.7c ) , pars=c("bM","bN") )
+
+# M -> K <- N
+# M <- U -> N
+n <- 100
+U <- rnorm( n )
+N <- rnorm( n , U )
+M <- rnorm( n , U )
+K <- rnorm( n , N - M )
+d_sim3 <- data.frame(K=K,N=N,M=M)
+
 
 m5.5d <- quap(
   alist(
@@ -594,6 +596,7 @@ m5.7d <- quap(
 precis(m5.5d)
 precis(m5.6d)
 precis(m5.7d)
+plot( coeftab( m5.5d , m5.6d , m5.7d ) , pars=c("bM","bN") )
 
 ## The Markov equivalence set can be computed using dagitty
 #R code 5.44
@@ -616,7 +619,6 @@ str(d)
 #it assumes that one of the categories is more uncertain than the other
 
 #The prior distribution of male and females
-
 #R code 5.46
 mu_female <- rnorm(1e4,178,20)
 mu_male <- rnorm(1e4,178,20) + rnorm(1e4,0,10)
@@ -635,7 +637,7 @@ m5.8 <- quap(
   ) , data=d )
 precis( m5.8 , depth=2 )
 
-#Expected differnece by extracting samples
+#Expected difference by extracting samples
 #R code 5.49
 post <- extract.samples(m5.8)
 post$diff_fm <- post$a[,1] - post$a[,2]
@@ -687,8 +689,93 @@ plot( precis( m5.10 , depth=2 , pars="a" ) , labels=labels ,
 ############# PRACTICE ####################################
 #EASY
 e1 = "μi=βxxi+βz & μi=α+βxxi+βzzi"
-e2 = "AD ~Normal(mu,sigma),
-      mu = a+  bl*l + bpd*pd,
-      a ~ Normal(0, 50),
-      bl ~Normal(0,1),
-      bpd ~Normal(0,1"
+e2 = "AD ~Normal(mu_i,sigma),
+      mu_i = a + BL * Li + BP * Pi"
+   
+e3 = "PhdT ~ Normal(mu_i, sigma), 
+      mu_i = a + BS*Si + BF*Fi"
+      
+e4 = "
+(1)  μi = α + βAAi + βBBi + βDDi
+(2)  μi = α + βAAi + βBBi + βCCi + βDDi
+(3)  μi = α + βBBi + βCCi + βDDi
+(4)  μi = αAAi + αBBi + αCCi + αDDi
+(5)  μi = αA(1−Bi−Ci−Di) + αBBi+αCCi + αDDi 
+Model 1 and 3-5 are inferentially equivalent.
+Models 1 and 3 both make use of 3 of the 4 total indicator
+variables which means that we can always derive the 
+parameter estimates for the 4th indicator variable from 
+a combination of the three parameter estimates present 
+as well as the intercept. Model 4 is akin to an index 
+variable approach which is inferentially the same as 
+an indicator approach (Models 1 and 3). Model 5 is the
+same as Model 4, so long as we assume that each observation 
+has to belong to one of the four indicator variables."
+
+#M1
+
+#Salary and free time has both spurious correlation with happiness  
+
+#Monthly salary in thousand dollars
+S = rnorm(1000, 3, 0.5)
+
+#Free time (hours/week)
+FT = rnorm(1000, 10-S, 2) 
+
+#Happiness 
+H = S*FT
+
+data = data.frame(S, FT, H)
+
+data$S = standardize(S)
+data$H = standardize(H)
+data$FT = standardize(FT)
+
+cor(FT, H)
+cor(S, H)
+cor(S,FT)
+
+m1S <- quap(
+  alist(
+    H ~ dnorm(mu, sigma),
+    mu <- a + BS * S*-1,
+    a ~ dnorm(0,0.3),
+    BS ~ dnorm(0,1),
+    sigma ~ dexp(1)
+  ), data = data
+)
+
+m1FT <- quap(
+  alist(
+    H ~ dnorm(mu, sigma),
+    mu <- a + BFT * FT,
+    a ~ dnorm(0,0.3),
+    BFT ~ dnorm(0,1),
+    sigma ~ dexp(1)
+  ), data = data
+)
+
+
+m1SFT <- quap(
+  alist(
+    H ~ dnorm(mu, sigma),
+    mu <- a + BFT * FT + BS * S*-1,
+    a ~ dnorm(0,0.3),
+    BFT ~ dnorm(0,0.1),
+    BS ~ dnorm(0,0.1),
+    sigma ~ dexp(1)
+  ), data = data
+)
+
+plot(coeftab(m1S, m1FT, m1SFT), par= c("BS", "BFT"))
+
+#H1
+cor(d$D, d$M)
+cor(d$D, d$A)
+cor(d$M, d$A)
+
+#DAG
+mad_dag <- dagitty("dag{M -> A -> D}")
+impliedConditionalIndependencies(mad_dag)
+equivalentDAGs(mad_dag)
+
