@@ -331,3 +331,125 @@ m6.12 <- quap(
     sigma ~ dexp( 1 )
   ), data=d )
 precis(m6.12)
+
+#R code 6.29
+library(dagitty)
+dag_6.1 <- dagitty( "dag {
+  U [unobserved]
+  X -> Y
+  X <- U <- A -> C -> Y
+  U -> B <- C
+}")
+adjustmentSets( dag_6.1 , exposure="X" , outcome="Y" )
+
+#R code 6.30
+library(dagitty)
+dag_6.2 <- dagitty( "dag {
+  A -> D
+  A -> M -> D
+  A <- S -> M
+  S -> W -> D
+}")
+
+adjustmentSets( dag_6.2 , exposure="W", outcome="D" )
+
+#R code 6.31
+impliedConditionalIndependencies( dag_6.2 )
+
+
+################## Practice problems ##################
+
+e1 = "multicolinearity, post-treatment bias and collider bias"
+
+e2= "Predicting langugae learning performance based on a battery of cognitve
+    tests, such as n-back, stroop, and ravens. Performance on these tests are
+    likely to be correlated. Using all of them will affect the predictive power
+    of an individual test on language learning. If there is a negative correlation
+    it can even remove the one predictors influence of the posterior distribution."
+
+e3 = "Fork, Pipe, Collier, Descendant
+      Coditioning of a fork or a pipe will close the relationship betweem two varibles 
+      connected by the confounder. Conditioning on a collider will remove the 
+      independence, it will open up a closed path. The effect on conditioning on
+      on a descendant is determined by its parent. Conditioning on the descendant
+      will partly give information about the parent"
+
+#m1
+library(dagitty)
+m1 <- dagitty("dag{ 
+  U [unobserved]
+  V [unobserved]
+  X -> Y
+  X <- U <- A -> C -> Y
+  U -> B <- C
+  C <- V -> Y}")
+
+adjustmentSets(m2, exposure = "X", outcome = "Y")
+#This does not open any new paths because it is a collider, no further action 
+#necessary.
+
+#M2
+X <- rnorm(1000,0,1)
+Z <- X + rnorm(1000, 0, 0.3)
+Y <- rnorm(1000,Z, 0.5)
+cor(X,Z)
+cor(X,Y)
+cor(Z,Y)
+d.m2 = data.frame(X=X, Z=Z, Y=Y)
+
+library(rethinking)
+m2 <- quap(
+  alist(
+    Y ~ dnorm(mu, sigma),
+    mu <- a + bx*X + bz*Z,
+    a ~ dnorm(0,0.2),
+    bx ~dnorm(0,0.4),
+    bz ~dnorm(0,0.4),
+    sigma ~ exp(1)
+  ), data = d.m2
+)
+#Model with just X as predictor
+m2.b <- quap(
+  alist(
+    Y ~ dnorm(mu, sigma),
+    mu <- a + bx*X ,
+    a ~ dnorm(0,0.2),
+    bx ~dnorm(0,0.4),
+    sigma ~ exp(1)
+  ), data = d.m2
+)
+precis(m2)
+precis(m2.b)
+#There is no multicollinearity, Z act as a mediator. Not including Z in the model
+#would lead to a spurious association between X and Y. In contrast to the left
+# right leg example, the outcome variable is only caused by one of the predictors.
+
+#M3
+dag1 = dagitty("dag{
+               x -> y
+               x <- z -> y 
+               z <- a -> y}")
+
+dag2= dagitty("dag{
+               x -> y
+               x -> z -> y 
+               z <- a -> y}")
+
+dag3 = dagitty("dag{
+               x -> y
+               x -> z <- y 
+               z <- a -> z}")
+
+dag4 = dagitty("dag{
+               x -> y
+               x -> z -> y 
+               z <- a -> z}")
+
+#My answers
+#dag 1 you could condition on a
+#dag 2 you should condition on z
+#dag 3 nothing
+#dag 4 condition on z
+
+#E1
+
