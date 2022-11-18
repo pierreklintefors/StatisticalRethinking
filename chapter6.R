@@ -451,5 +451,180 @@ dag4 = dagitty("dag{
 #dag 3 nothing
 #dag 4 condition on z
 
-#E1
+####H1
+library(rethinking)
+data(WaffleDivorce)
+d = WaffleDivorce
 
+d$A = standardize(d$MedianAgeMarriage)
+d$M = standardize(d$Marriage)
+d$D = standardize(d$Divorce)
+d$W = standardize(d$WaffleHouses)
+d$S = standardize(d$South)
+
+
+library(dagitty)
+dag_H1 <- dagitty("dag{
+                  S -> W -> D
+                  A <- S -> M
+                  A -> D
+                  A -> M -> D
+                  }") 
+
+adjustmentSets(dag_e1, exposure = "W", outcome = "D")
+
+H1 = quap(
+    alist(
+      D ~ dnorm(mu, sigma),
+      mu <- a + bS*S + bW*W ,
+      a ~ dnorm(0, 0.1),
+      bS ~ dnorm(0, 0.5),
+      bW ~ dnorm(0, 0.5),
+      sigma ~ dexp(1)
+    ), data = d
+)
+plot(precis(e1))
+
+### H2
+
+impliedConditionalIndependencies(dag_H1)
+
+
+#A _||_ W | S
+H2a = quap(
+  alist(
+    A ~ dnorm(mu, sigma),
+    mu <- a + bS*S + bW*W ,
+    a ~ dnorm(0, 0.1),
+    bS ~ dnorm(0, 0.5),
+    bW ~ dnorm(0, 0.5),
+    sigma ~ dexp(1)
+  ), data = d
+)
+plot(precis(H2a))
+
+#D _||_ S | A, M, W
+H2b = quap(
+  alist(
+    D ~ dnorm(mu, sigma),
+    mu <- a + bS*S + bW*W + bA*A + bM*M ,
+    a ~ dnorm(0, 0.1),
+    c(bS, bW, bA, bM) ~ dnorm(0, 0.5),
+    sigma ~ dexp(1)
+  ), data = d
+)
+plot(precis(H2b))
+
+#M _||_ W | S
+H2c = quap(
+  alist(
+    M ~ dnorm(mu, sigma),
+    mu <- a + bS*S + bW*W ,
+    a ~ dnorm(0, 0.1),
+    bS ~ dnorm(0, 0.5),
+    bW ~ dnorm(0, 0.5),
+    sigma ~ dexp(1)
+  ), data = d
+)
+plot(precis(H2c))
+
+
+
+
+##### Home ẃork week 3 ###
+#https://github.com/rmcelreath/statrethinking_winter2019/blob/master/homework/week03.pdf
+
+#data
+library(rethinking)
+data(foxes)
+
+
+#Dag for all problems
+library(dagitty)
+foxes_dag <- dagitty("dag{
+                     F -> G -> W
+                     A -> F -> W
+}")
+
+#standardise variables
+foxes$G = standardize(foxes$groupsize)
+foxes$W = standardize(foxes$weight)
+foxes$F = standardize(foxes$avgfood)
+foxes$A = standardize(foxes$area)
+
+with(foxes, hist(G))
+with(foxes, hist(W))
+with(foxes, hist(F))
+with(foxes, hist(A))
+
+#1. Model to infer the total causal influence of area on weights. Would increasing
+# the area for each fox make them heavier (positive correlation)
+
+adjustmentSets(foxes_dag, exposure = "A", outcome = "W")
+
+#Only front door paths, no need for control
+
+
+
+#Prior predictive simulations
+sim_a <- rnorm(1e3, 0, 0.6)
+sim_w <- rnorm(1e3, 0, 0.8)
+dens(sim_a)
+dens(foxes$A)
+dens(sim_w)
+dens(foxes$W)
+
+# Model 
+area_model <- quap(
+  alist(
+    W ~ dnorm(mu, sigma),
+    mu <- a + bA*A,
+    a ~ dnorm(0, 0.2),
+    bA  ~ dnorm(0, 0.6),
+    sigma ~ dexp(1)
+  ), data = foxes
+)
+
+precis(area_model)
+
+
+## 2. Infer the causal impact of food, which covariates needs to be adjust?
+
+adjustmentSets(foxes_dag, exposure = "F", outcome = "W")
+
+sim_food = runif(1000, -2,2)
+
+dens(foxes$F)
+dens(standardize(sim_food))
+food_model <- quap(
+  alist(
+    W ~ dnorm(mu, sigma),
+    mu <- a + bF*F ,
+    a ~ dnorm(0, 0.2),
+    bF  ~ dnorm(0, 0.8),
+    sigma ~ dexp(1)
+  ), data = foxes
+)
+
+precis(food_model)
+
+
+# 3 Infer causal impact of group size
+
+adjustmentSets(foxes_dag, exposure = "G", outcome = "W")
+
+dens(foxes$G)
+sim_G = rnorm(1000, 0, 0.9)
+dens(sim_G)
+group_model <- quap(
+  alist(
+    W ~ dnorm(mu, sigma),
+    mu <- a + bG *G + bF*F ,
+    a ~ dnorm(0, 0.2),
+    bF  ~ dnorm(0, 0.8),
+    bG  ~ dnorm(0, 0.9),
+    sigma ~ dexp(1)
+  ), data = foxes
+)
+
+precis(group_model)
