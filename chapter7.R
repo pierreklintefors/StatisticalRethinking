@@ -138,3 +138,37 @@ par(mfrow=c(3,2))
 for ( model in models){
   brain_loo_plot(model)
 }
+
+###########Entropy and accuracy##################
+ 
+#Entropy = H(p) = -E(log(p))
+
+#Entropy for two events with .3 and 7 probability
+#H(p) = − (p1log(p1) + p2log(p2))≈0.61
+
+#R code 7.12
+p <- c( 0.3 , 0.7 )
+-sum( p*log(p) )
+
+#Computing the log of the average probability for each observation
+# using log-pointwise-predictive-density (lppd)
+
+#R code 7.13
+set.seed(1)
+lppd( m7.1 , n=1e4 )
+
+#The coded needed to replicate the code above
+#R code 7.14
+
+set.seed(1)
+logprob <- sim( m7.1 , ll=TRUE , n=1e4 )#ll=True returns the log-probability
+n <- ncol(logprob)
+ns <- nrow(logprob)
+f <- function( i ) log_sum_exp( logprob[,i] ) - log(ns)
+( lppd <- sapply( 1:n , f ) )
+
+#Log score of each of the previous models, same as R2 it is increased with complexity
+#R code 7.15
+set.seed(1) 
+sapply( list(m7.1,m7.2,m7.3,m7.4,m7.5,m7.6) , function(m) sum(lppd(m)) )
+
