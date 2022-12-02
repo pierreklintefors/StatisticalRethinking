@@ -630,4 +630,131 @@ min(I1_score,I2_score,I3_score)
 # to the others distribution of birds. It has an equal distribution of the species
 # and gives equal probability in its predictions. In contrast Island 2 and 3 has 
 # a clear dominating species and few of the others. This make them bad models in
-# predicting other Island populations that does not share their skewness. 
+# predicting other Island populations that does not share their skewness.
+
+#H4
+#Rerun the collider bias models m6.9, m6.10 from chapter 6 and compare WAIC
+
+#R code 6.21
+library(rethinking)
+d <- sim_happiness( seed=1977 , N_years=1000 )
+precis(d)
+
+#rescale age
+#R code 6.22
+d2 <- d[ d$age>17 , ] # only adults
+d2$A <- ( d2$age - 18 ) / ( 65 - 18 )
+
+#R code 6.23
+d2$mid <- d2$married + 1 # New index for marriage 1 - single, 2 -married
+
+m6.9 <- quap(
+  alist(
+    happiness ~ dnorm( mu , sigma ),
+    mu <- a[mid] + bA*A,
+    a[mid] ~ dnorm( 0 , 1 ) ,
+    bA ~ dnorm( 0 , 2 ) ,
+    sigma ~ dexp(1)
+  ) , data=d2 )
+precis(m6.9,depth=2)
+
+#The model below omits marriage status to avoid collider bias
+#R code 6.24
+m6.10 <- quap(
+  alist(
+    happiness ~ dnorm( mu , sigma ),
+    mu <- a + bA*A,
+    a ~ dnorm( 0 , 1 ),
+    bA ~ dnorm( 0 , 2 ),
+    sigma ~ dexp(1)
+  ) , data=d2 )
+precis(m6.10)
+WAIC(m6.9)
+WAIC(m6.10)
+
+h4 = "According to the waic, the m6.9 model will make better out-of-sample 
+      predictions. However, by stratifying the sample by married and single 
+      people it creates a collider bias. The first model has better predictions
+      because the marrige variable correlates more with rated happiness. However,
+      it does not adequatley show the causal relationship between age and happiness."
+
+cor(d2$mid, d2$happiness)
+
+####H5
+data("foxes")
+
+#standardise variables
+foxes$G = standardize(foxes$groupsize)
+foxes$W = standardize(foxes$weight)
+foxes$F = standardize(foxes$avgfood)
+foxes$A = standardize(foxes$area)
+
+m1 = quap(
+  alist(
+    W ~ dnorm(mu, sigma),
+    mu <- a + b[1]*F + b[2]*G + b[3]*A,
+    a ~ dnorm(0,0.1),
+    b ~ dnorm(0,0.2),
+    sigma ~ dexp(1)
+    
+  ), data = foxes, start = list(b=rep(0,3))
+)
+
+m2 = quap(
+  alist(
+    W ~ dnorm(mu, sigma),
+    mu <- a + b[1]*F + b[2]*G,
+    a ~ dnorm(0,0.1),
+    b ~ dnorm(0,0.2),
+    sigma ~ dexp(1)
+  ), data = foxes, start = list(b=rep(0,2))
+)
+
+m3 = quap(
+  alist(
+    W ~ dnorm(mu, sigma),
+    mu <- a + b[1]*G + b[2]*A,
+    a ~ dnorm(0,0.1),
+    b ~ dnorm(0,0.2),
+    sigma ~ dexp(1)
+  ), data = foxes, start = list(b=rep(0,2))
+)
+
+m4 = quap(
+  alist(
+    W ~ dnorm(mu, sigma),
+    mu <- a + b*F,
+    a ~ dnorm(0,0.1),
+    b ~ dnorm(0,0.2),
+    sigma ~ dexp(1)
+  ), data = foxes
+)
+
+m5 = quap(
+  alist(
+    W ~ dnorm(mu, sigma),
+    mu <- a + b*A,
+    a ~ dnorm(0.1,0.1),
+    b ~ dnorm(0,0.2),
+    sigma ~ dexp(1)
+  ), data = foxes
+)
+
+compare(m1, m2, m3, m4, m5, func = WAIC)
+library(dagitty)
+foxes_dag <- dagitty("dag{
+                     F -> G -> W
+                     A -> F -> W
+}")
+
+drawdag(foxes_dag)
+
+H5 = "The model with best prediction was m1 which contains
+      area, average food and group size as predictors. By inclusing G
+      the model does not give the total cuasal power of F, becuase
+      it is only the direct effect that is un-blocked. This effect
+      is probably even underestimated becasue A is also included in the model.
+      A's effect is also not included because all the mediated ways from A to W
+      are also included in the model and thereby blocked.
+      G's effect is biased becasue and back-door is opened by including
+      F."
