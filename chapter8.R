@@ -275,19 +275,140 @@ e1 = " 1: temperature, 2: Sex, 3: Functional tank"
 
 e2 = "(1)  Caramelizing onions requires cooking over low heat and making sure the onions do not dry out."
 
+#M1
 M1 = "There is an interaction where the temperature 
       restric the photosyntetic process from happening,
       either by imparing the effect of water, light
       or both."
-
+#M2
 M2 = "mu = a + Bt(Bw + BS + Bws)"
 
+par(mfrow=c(1,1))
 
-pray = rnorm(1e4,10,1)
-seeds = rnorm(1e4,10,1) -pray
 
+#M3
 wolves = rnorm(1e4, 5, 0.2)
-mu = -pray*wolves + seeds
-ravens = rnorm(1e4, mu, 1)
+pray = rnorm(1e4,10,5) * wolves ^ 2
+seeds = rnorm(1e4,10,1) - pray/2
+mu = pray + seeds
+ravens = rnorm(1e4, mu, 2)
 
 plot(wolves, ravens)
+cor(wolves, ravens)
+
+#M4
+# Repeat the tulips analysis, but this time use priors that constrain
+# the effect of water to be positive and the effect of shade to be negative. 
+# Use prior predictive simulation. What do these prior assumptions mean for the 
+# interaction prior, if anything
+
+
+library(rethinking)
+data(tulips)
+d <- tulips
+str(d)
+
+#Scaling variables by their max
+#R code 8.20
+d$blooms_std <- d$blooms / max(d$blooms)
+d$water_cent <- d$water - mean(d$water)
+d$shade_cent <- d$shade - mean(d$shade)
+
+#Model with interaction
+M4 <- quap(
+  alist(
+    blooms_std ~ dnorm( mu , sigma ) ,
+    mu <- a + bw*water_cent + bs*shade_cent + bws*water_cent*shade_cent ,
+    a ~ dnorm( 0.5 , 0.25 ) ,
+    bw ~ dlnorm(0.5 ) ,
+    bs ~ dnorm( 0 , 0.25 ) ,
+    bws ~ dnorm( 0 , 0.25 ) ,
+    sigma ~ dexp( 1 )
+  ) , data=d )
+
+
+#Plot piror predictions using triptych
+#R code 8.26
+set.seed(7)
+par(mfrow=c(2,3)) # 3 plots in 1 row
+models = c(m8.5, M4)
+for (model in models){
+  prior <- extract.prior(model)
+  for ( s in -1:1 ) {
+    idx <- which( d$shade_cent==s )
+    plot( d$water_cent[idx] , d$blooms_std[idx] , type = "n", 
+          xlim=c(-1,1) , ylim=c(-0.1,1.1) ,
+          xlab="water" , ylab="blooms" , pch=16 , col=rangi2 )
+    mu <- link(model , post = prior, data=data.frame( shade_cent=s , water_cent=-1:1 ) )
+    for ( i in 1:20 ) lines( -1:1 , mu[i,] , col=col.alpha("black",0.3) )
+    abline(h = c(-0, 1), lty = 'dashed' )
+  }
+  
+}
+
+par(mfrow=c(2,3)) # 3 plots in 1 row
+for (model in models){
+  for ( s in -1:1 ) {
+    idx <- which( d$shade_cent==s )
+    plot( d$water_cent[idx] , d$blooms_std[idx] , xlim=c(-1,1) , ylim=c(0,1) ,
+          xlab="water" , ylab="blooms" , pch=16 , col=rangi2 )
+    mu <- link( model , data=data.frame( shade_cent=s , water_cent=-1:1 ) )
+    for ( i in 1:20 ) lines( -1:1 , mu[i,] , col=col.alpha("black",0.3) )
+  }
+}
+
+#When the prior for waters effect is forced to be positive all the piror slopes 
+# are positive. However it does not seems to affect the posterior that much.
+# The large amount of data makes the choice of prior less crucial.
+
+
+##H1
+#Return to the data(tulips) example in the chapter. Now include the bed variable 
+#as a predictor in the interaction model. 
+
+
+d$ind = as.integer(d$bed)
+
+
+H1 <- quap(
+  alist(
+    blooms_std ~ dnorm( mu , sigma ) ,
+    mu <- a + bb[ind]* ind + bw*water_cent + bs*shade_cent + bws*water_cent*shade_cent ,
+    a ~ dnorm( 0.5 , 0.25 ) ,
+    bb[ind] ~dnorm(0, 0.25),
+    bw ~ dlnorm(0.5 ) ,
+    bs ~ dnorm( 0 , 0.25 ) ,
+    bws ~ dnorm( 0 , 0.25 ) ,
+    sigma ~ dexp( 1 )
+  ) , data=d )
+
+
+precis(H1, depth = 3)
+
+
+# H2
+H2 <- quap(
+  alist(
+    blooms_std ~ dnorm( mu , sigma ) ,
+    mu <- a+ bw*water_cent + bs*shade_cent + bws*water_cent*shade_cent ,
+    a ~ dnorm( 0.5 , 0.25 ) ,
+    bw ~ dlnorm(0.5 ) ,
+    bs ~ dnorm( 0 , 0.25 ) ,
+    bws ~ dnorm( 0 , 0.25 ) ,
+    sigma ~ dexp( 1 )
+  ) , data=d )
+
+compare(H1, H2, WAIC = T)
+compare(H1, H2, func = PSIS)
+
+par(mfrow=c(1,1))
+plot(compare(H1, H2, WAIC = T))
+
+
+#According to the posteriors, bed does not seem to be a good predictor of water
+#when the predictors are included in the model. Furthermore, the WAIC score
+# does not give reliable more weight to the model that includes bed. 
+
+#H3
+
+
