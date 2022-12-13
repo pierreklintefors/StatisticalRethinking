@@ -155,4 +155,163 @@ HMC2 <- function (U, grad_U, epsilon, L, current_q) {
     accept <- 1
   } else new_q <- current_q # reject
   return(list( q=new_q, traj=qtraj, ptraj=ptraj, accept=accept ))
-  }
+}
+
+######## Ulam using rugged data
+
+#R code 9.11
+library(rethinking)
+data(rugged)
+d <- rugged
+d$log_gdp <- log(d$rgdppc_2000)
+dd <- d[ complete.cases(d$rgdppc_2000) , ]
+dd$log_gdp_std <- dd$log_gdp / mean(dd$log_gdp)
+dd$rugged_std <- dd$rugged / max(dd$rugged)
+dd$cid <- ifelse( dd$cont_africa==1 , 1 , 2 )
+
+#Quad aproximation model
+#R code 9.12
+m8.3 <- quap(
+  alist(
+    log_gdp_std ~ dnorm( mu , sigma ) ,
+    mu <- a[cid] + b[cid]*( rugged_std - 0.215 ) ,
+    a[cid] ~ dnorm( 1 , 0.1 ) ,
+    b[cid] ~ dnorm( 0 , 0.3 ) ,
+    sigma ~ dexp( 1 )
+  ) , data=dd )
+precis( m8.3 , depth=2 )
+
+
+#When using ulam (HMC):
+#Preprocc all variables before
+#Trim down data to only the variable of interest
+
+#R code 9.13 #list instead of Df because elements in a list can be of differetn lenghts
+dat_slim <- list(
+  log_gdp_std = dd$log_gdp_std,
+  rugged_std = dd$rugged_std,
+  cid = as.integer( dd$cid )
+)
+str(dat_slim)
+
+
+#Using HCM Ulam
+#R code 9.14
+
+m9.1 <- ulam(
+  alist(
+    log_gdp_std ~ dnorm( mu , sigma ) ,
+    mu <- a[cid] + b[cid]*( rugged_std - 0.215 ) ,
+    a[cid] ~ dnorm( 1 , 0.1 ) ,
+    b[cid] ~ dnorm( 0 , 0.3 ) ,
+    sigma ~ dexp( 1 )
+  ) , data=dat_slim , chains=1 )
+
+#R code 9.15
+precis( m9.1 , depth=2 )
+
+#Multiple chains in paralell
+#R code 9.16
+m9.1 <- ulam(
+  alist(
+    log_gdp_std ~ dnorm( mu , sigma ) ,
+    mu <- a[cid] + b[cid]*( rugged_std - 0.215 ) ,
+    a[cid] ~ dnorm( 1 , 0.1 ) ,
+    b[cid] ~ dnorm( 0 , 0.3 ) ,
+    sigma ~ dexp( 1 )
+  ) , data=dat_slim , chains=4 , cores=4 )
+
+
+#R code 9.17
+show( m9.1 )
+
+#R code 9.18
+precis( m9.1 , 2 )
+
+
+#R code 9.19
+pairs( m9.1 )
+
+
+#tace plots
+#R code 9.20
+traceplot( m9.1 )
+
+#Trace rank plots, histograms of each individual parameter ranked values
+#R code 9.21
+trankplot( m9.1 )
+
+#Using really flat priors canmake the chain erratically sample extreme parameter values
+
+#R code 9.22
+y <- c(-1,1)
+set.seed(11)
+m9.2 <- ulam(
+  alist(
+    y ~ dnorm( mu , sigma ) ,
+    mu <- alpha ,
+    alpha ~ dnorm( 0 , 1000 ) ,
+    sigma ~ dexp( 0.0001 )
+  ) , data=list(y=y) , chains=3 )
+
+
+#R code 9.23
+precis( m9.2, )
+
+pairs(m9.2@stanfit)
+
+traceplot(m9.2)
+
+
+#The chains in this case can be fixed with more informative priors
+
+#R code 9.24
+set.seed(11)
+m9.3 <- ulam(
+  alist(
+    y ~ dnorm( mu , sigma ) ,
+    mu <- alpha ,
+    alpha ~ dnorm( 1 , 10 ) ,
+    sigma ~ dexp( 1 )
+  ) , data=list(y=y) , chains=3 )
+precis( m9.3 )
+
+traceplot(m9.3)
+
+
+#Non-indentifiable model
+#Gaussian with mean 0 and sd 1
+#R code 9.25
+set.seed(41)
+y <- rnorm( 100 , mean=0 , sd=1 )
+
+
+#R code 9.26
+set.seed(384)
+m9.4 <- ulam(
+  alist(
+    y ~ dnorm( mu , sigma ) ,
+    mu <- a1 + a2 ,
+    a1 ~ dnorm( 0 , 1000 ),
+    a2 ~ dnorm( 0 , 1000 ),
+    sigma ~ dexp( 1 )
+  ) , data=list(y=y) , chains=3 )
+precis( m9.4 )
+
+
+#With weakly informative priors
+#R code 9.27
+m9.5 <- ulam(
+  alist(
+    y ~ dnorm( mu , sigma ) ,
+    mu <- a1 + a2 ,
+    a1 ~ dnorm( 0 , 10 ),
+    a2 ~ dnorm( 0 , 10 ),
+    sigma ~ dexp( 1 )
+  ) , data=list(y=y) , chains=3 )
+precis( m9.5 )
+
+traceplot(m9.5)
+
+
+##### PRATICE ############
