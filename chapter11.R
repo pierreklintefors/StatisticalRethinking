@@ -651,3 +651,117 @@ p_new <- sapply( 1:length(post$b) , function(i)
 # summarize
 p_diff <- p_new[2,] - p_orig[2,]
 precis( p_diff )
+
+#Family income as a predictor for each row
+N <- 500
+# simulate family incomes for each individual
+family_income <- runif(N)
+
+# assign a unique coefficient for each type of event
+b <- c(-2,0,2)
+
+career <- rep(NA,N) # empty vector of choices for each individual
+
+for ( i in 1:N ) {
+  score <- 0.5*(1:3) + b*family_income[i]
+  p <- softmax(score[1],score[2],score[3])
+   career[i] <- sample( 1:3 , size=1 , prob=p )
+}
+
+code_m11.14 <- "
+data{
+  int N; // number of observations
+  int K; // number of outcome values
+  int career[N]; // outcome
+  real family_income[N];
+}
+parameters{
+  vector[K-1] a; // intercepts
+  vector[K-1] b; // coefficients on family income
+}
+model{
+  vector[K] p;
+  vector[K] s;
+  a ~ normal(0,1.5);
+  b ~ normal(0,1);
+  for ( i in 1:N ) {
+    for ( j in 1:(K-1) ) s[j] = a[j] + b[j]*family_income[i];
+    s[K] = 0; // the pivot
+    p = softmax( s );
+    career[i] ~ categorical( p );
+  }
+}
+
+"
+
+dat_list <- list( N=N , K=3 , career=career , family_income=family_income )
+m11.14 <- stan( model_code=code_m11.14 , data=dat_list , chains=4 )
+precis( m11.14 , 2 )
+
+
+
+#Multinomial likelihood as Poisson with the Berkely admission data
+
+#R code 11.60
+library(rethinking)
+data(UCBadmit)
+d <- UCBadmit
+
+
+#b[1] -2.72 0.60 -3.69 -1.79 2128 1
+
+b[2] -1.72 0.39 -2.32 -1.10 2183 1
+
+Again, computing implied predictions is the safest way to interpret these models. They do a great job of classifying discrete, unordered events. But the parameters are on a scale that is very hard to interpret. In this case, b[2] ended up negative, because it is relative to the pivot, for which family income has a positive effect. If you produce posterior predictions on the probability scale, you’ll see this.
+
+11.3.3. Multinomial in disguise as Poisson. Another way to fit a multinomial/categorical model is to refactor it into a series of Poisson likelihoods.180 That should sound a bit crazy. But it’s actually both principled and commonplace to model multinomial outcomes this way. It’s principled, because the mathematics justifies it. And it’s commonplace, because it is usually computationally easier to use Poisson rather than multinomial likelihoods. Here I’ll give an example of an implementation. For the mathematical details of the transformation, see the Overthinking box at the end.
+
+I appreciate that this kind of thing—modeling the same data different ways but getting the same inferences—is exactly the kind of thing that makes statistics maddening for scientists. So I’ll begin by taking a binomial example from earlier in the chapter and doing it over as a Poisson regression. Since the binomial is just a special case of the multinomial, the approach extrapolates to any number of event types. Think again of the UC Berkeley admissions data. Let’s load it again:
+  
+  R code 11.60
+
+library(rethinking)
+
+data(UCBadmit)
+
+d <- UCBadmit
+
+
+#R code 11.61
+
+# binomial model of overall admission probability
+m_binom <- quap(
+  alist(
+    admit ~ dbinom(applications,p),
+    logit(p) <- a,
+    a ~ dnorm( 0 , 1.5 )
+  ), data=d )
+
+
+# Poisson model of overall admission rate and rejection rate
+# ‘reject’ is a reserved word in Stan, cannot use as variable name
+dat <- list( admit=d$admit , rej=d$reject )
+m_pois <- ulam(
+  alist(
+    admit ~ dpois(lambda1),
+    rej ~ dpois(lambda2),
+    log(lambda1) <- a1,
+    log(lambda2) <- a2,
+    c(a1,a2) ~ dnorm(0,1.5)
+  ), data=dat , chains=3 , cores=3 )
+
+#Posterior means (However, this is just for simplicity, the whole posterior should be used)
+#R code 11.62
+inv_logit(coef(m_binom))
+
+
+#Poission model of admission lamda1 / lamda1 + lamda2
+#Lamda expexted value of the intercept
+#R code 11.63
+k <- coef(m_pois)
+a1 <- k['a1']; a2 <- k['a2']
+exp(a1)/(exp(a1)+exp(a2))
+
+
+#It is important to calculate the implied predictions becasue the parameters
+#are on different scales than the outcome variable
